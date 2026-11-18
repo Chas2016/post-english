@@ -1,0 +1,27 @@
+name: 缺陷报告
+description: 报告扩展使用中的问题
+title: '[缺陷] '
+body:
+  - type: markdown
+    attributes:
+      value: 请先搜索是否已有相同问题。截图和日志请遮盖 API Key、账号信息和私密内容。安全问题请按 SECURITY.md 提交。
+  - type: input
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 填写扩展版本、浏览器版本、操作系统。若与模型请求有关，请注明服务商和模型名。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 写出打开的页面类型、点击的入口和可以公开的原文示例。
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 实际结果与预期结果
+    validations:
+      required: true

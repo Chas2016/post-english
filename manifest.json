@@ -1,0 +1,68 @@
+{
+  "manifest_version": 3,
+  "name": "读帖英语",
+  "version": "1.5.1",
+  "description": "在 X 读英文原帖，按需解释回复和短语，收藏表达并用新帖复习。支持 DeepSeek 和 MiniMax。",
+  "permissions": [
+    "storage",
+    "alarms",
+    "activeTab",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://api.deepseek.com/*",
+    "https://api.minimax.cn/*",
+    "https://api.minimaxi.com/*",
+    "https://api.minimax.io/*",
+    "https://api.minimax.chat/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://x.com/*", "https://www.x.com/*", "https://twitter.com/*", "https://www.twitter.com/*"],
+      "js": ["x-context.js", "x-learning-ui.js", "x-learning.js"],
+      "css": ["x-learning.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "读帖英语",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["compose/compose.html"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "toggle-translate": {
+      "suggested_key": {
+        "default": "Alt+T"
+      },
+      "description": "翻译本页 / 恢复原文"
+    }
+  }
+}

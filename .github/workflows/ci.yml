@@ -1,0 +1,66 @@
+name: 测试与发布
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: 测试与打包
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: 检查 JavaScript 语法
+        run: |
+          git ls-files -z '*.js' '*.mjs' '*.cjs' | xargs -0 -n 1 node --check
+      - name: 运行后台和 Chromium 测试
+        run: |
+          chrome_bin="$(command -v google-chrome)"
+          CHROME_BIN="$chrome_bin" npm test
+      - name: 检查安装包
+        run: |
+          npm run package
+          unzip -tq dist/post-english-v*.zip
+
+  release:
+    name: 发布 GitHub Release
+    if: github.ref_type == 'tag'
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: 核对标签并生成安装包
+        run: |
+          version="$(node -p "require('./manifest.json').version")"
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::发布标签必须与 manifest.json 中的版本一致，应为 v$version"
+            exit 1
+          fi
+          npm run package
+      - name: 上传安装包
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/post-english-${GITHUB_REF_NAME}.zip" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --notes-from-tag

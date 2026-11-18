@@ -1,0 +1,18 @@
+name: 功能建议
+description: 提议改进 X 阅读、英语学习或翻译流程
+title: '[建议] '
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 你当时在读什么？当前流程卡在哪一步？
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: 期望的体验
+      description: 描述你希望扩展如何响应，以及怎样判断改动有效。
+    validations:
+      required: true

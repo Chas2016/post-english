@@ -1,0 +1,380 @@
+/* 译文沿用站点文字颜色，并用左边线和留白区分层级。 */
+.tr-target-block {
+  display: block;
+  box-sizing: border-box;
+  border-inline-start: 2px solid currentColor;
+  margin: .45em 0 .75em;
+  padding: .08em 0 .08em .72em;
+  min-width: 0;
+  color: var(--tr-source-color, inherit);
+  font-size: .93em;
+  line-height: 1.55;
+  text-align: start;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tr-target-block.tr-loading {
+  opacity: .75;
+}
+
+.tr-target-block.tr-study {
+  border-inline-start-color: transparent;
+  padding-inline-start: 0;
+  margin: .25em 0 .5em;
+}
+
+.tr-study .tr-target-text {
+  border-inline-start: 2px solid currentColor;
+  margin-block-start: .45em;
+  padding-inline-start: .72em;
+}
+
+.tr-target-block .tr-target-text[hidden],
+html[data-tr-mode='original'] .tr-target-block,
+html[data-tr-mode='translation'] .tr-src-block {
+  display: none !important;
+}
+
+.tr-study-toggle {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: .88em;
+  line-height: 1.25;
+  min-height: 26px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.tr-study-toggle:hover, .tr-study-toggle[aria-expanded='true'] {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.tr-hl {
+  background: transparent;
+  color: inherit;
+  text-decoration: underline #b07912 2px;
+  text-underline-offset: .18em;
+}
+
+html[data-tr-mode='original'] .tr-hl {
+  text-decoration: none;
+}
+
+.tr-dock, .tr-compose-dialog, .tr-popup, .tr-status {
+  --tr-panel: #fff;
+  --tr-surface: #f6f5ef;
+  --tr-text: #202b27;
+  --tr-muted: #485751;
+  --tr-border: #d4dcd7;
+  --tr-accent: #145746;
+  --tr-accent-text: #fff;
+  --tr-error: #a32d27;
+  color: var(--tr-text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+}
+
+.tr-dock {
+  --tr-dock-ink: #195650;
+  --tr-dock-line: #cedbd8;
+  --tr-dock-hover: #edf4f2;
+  --tr-dock-selected: #e0f1eb;
+  --tr-dock-selected-line: #88bcaf;
+  position: fixed;
+  z-index: 2147483646;
+  inset-inline-end: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--tr-dock-line);
+  border-radius: 13px;
+  background: var(--tr-panel);
+  box-shadow: 0 1px 2px #14252014, 0 3px 10px #14252016;
+}
+
+.tr-dock button.tr-dock-button {
+  box-sizing: border-box;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tr-dock-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tr-dock button.tr-ball {
+  font-size: 15px;
+}
+
+.tr-dock button.tr-dock-button:hover {
+  border-color: var(--tr-dock-line);
+  background: var(--tr-dock-hover);
+}
+
+.tr-dock button.tr-ball.active {
+  background: var(--tr-dock-selected);
+  border-color: var(--tr-dock-selected-line);
+}
+
+.tr-dock button:focus-visible, .tr-popup button:focus-visible, .tr-study-toggle:focus-visible,
+.tr-compose-dialog :is(button, a):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.tr-dock button:focus-visible {
+  outline-color: var(--tr-dock-ink);
+}
+
+.tr-dock-usage {
+  box-sizing: border-box;
+  width: 52px;
+  padding: 5px 1px 4px;
+  border-block-start: 1px solid var(--tr-dock-line);
+  color: var(--tr-muted);
+  line-height: 1.35;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tr-dock-usage::part(label) {
+  display: block;
+  font-size: 10px;
+}
+
+.tr-dock-usage::part(amount) {
+  display: block;
+  color: var(--tr-dock-ink);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-compose-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(900px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  box-sizing: border-box;
+  padding: 0;
+  margin: auto;
+  border: 1px solid var(--tr-border);
+  border-radius: 16px;
+  background: var(--tr-surface);
+  box-shadow: 0 18px 60px #14251c44;
+  overflow: hidden;
+}
+
+.tr-compose-dialog:not([open]) {
+  display: none !important;
+}
+
+.tr-compose-dialog::backdrop {
+  background: rgb(14 25 20 / 42%);
+}
+
+.tr-compose-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--tr-border);
+  background: var(--tr-panel);
+}
+
+.tr-compose-head h2 {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+}
+
+.tr-compose-load {
+  padding: 20px 16px;
+  color: var(--tr-muted);
+}
+
+.tr-compose-load a {
+  color: var(--tr-accent);
+  text-decoration: underline;
+}
+
+.tr-compose-frame {
+  display: none;
+  width: 100%;
+  height: min(450px, calc(100dvh - 82px));
+  border: 0;
+  background: var(--tr-surface);
+}
+
+.tr-compose-dialog[data-load='ready'] .tr-compose-frame {
+  display: block;
+}
+
+.tr-compose-load[hidden] {
+  display: none !important;
+}
+
+.tr-status {
+  position: fixed;
+  inset-block-start: 16px;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  width: max-content;
+  max-width: min(85vw, 34rem);
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 1px solid var(--tr-border);
+  border-radius: 10px;
+  background: var(--tr-panel);
+  box-shadow: 0 4px 18px #14251c29;
+  opacity: 0;
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+
+.tr-status.show {
+  opacity: 1;
+}
+
+.tr-status.error {
+  color: var(--tr-error);
+}
+
+.tr-popup {
+  position: fixed;
+  z-index: 2147483647;
+  inset-block-start: 24px;
+  inset-inline-end: 16px;
+  width: 330px;
+  max-width: calc(100vw - 32px);
+  max-height: 65vh;
+  box-sizing: border-box;
+  background: var(--tr-panel);
+  border: 1px solid var(--tr-border);
+  border-radius: 13px;
+  box-shadow: 0 9px 32px #14251c33;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  text-align: start;
+}
+
+.tr-popup.show {
+  display: flex;
+}
+
+.tr-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--tr-border);
+  background: var(--tr-surface);
+  font-weight: 650;
+}
+
+.tr-popup-close {
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tr-muted);
+  font: 22px/1 sans-serif;
+  cursor: pointer;
+}
+
+.tr-popup-close:hover {
+  background: var(--tr-panel);
+  color: var(--tr-text);
+}
+
+.tr-popup-body {
+  padding: 12px 16px 16px;
+  overflow-y: auto;
+}
+
+.tr-popup-source, .tr-popup-target {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tr-popup-source {
+  color: var(--tr-muted);
+  margin-block-end: 10px;
+  padding-block-end: 10px;
+  border-block-end: 1px solid var(--tr-border);
+}
+
+.tr-popup-target {
+  color: var(--tr-accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tr-dock, .tr-compose-dialog, .tr-popup, .tr-status {
+    --tr-panel: #202c27;
+    --tr-surface: #293730;
+    --tr-text: #eff6f0;
+    --tr-muted: #c4d4c9;
+    --tr-border: #455e51;
+    --tr-accent: #9bd7b9;
+    --tr-accent-text: #14251c;
+    --tr-error: #ffb8b3;
+  }
+
+  .tr-dock {
+    --tr-dock-ink: #a5ded3;
+    --tr-dock-line: #455e58;
+    --tr-dock-hover: #29413d;
+    --tr-dock-selected: #214640;
+    --tr-dock-selected-line: #5b9588;
+  }
+}
+
+@media (forced-colors: active) {
+  .tr-dock button.tr-ball.active {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+@media (max-width: 480px) {
+  .tr-dock {
+    inset-inline-end: 6px;
+  }
+
+  .tr-compose-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .tr-compose-frame {
+    height: min(585px, calc(100dvh - 66px));
+  }
+}

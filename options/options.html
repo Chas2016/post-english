@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>插件设置 · 双语阅读</title>
+  <link rel="stylesheet" href="options.css" />
+  <script src="options.js" defer></script>
+</head>
+<body>
+  <main class="settings">
+    <header class="page-header">
+      <h1>设置</h1>
+    </header>
+
+    <section class="area" aria-labelledby="reading-title">
+      <div class="section-heading">
+        <h2 id="reading-title">阅读偏好</h2>
+        <p>阅读偏好会自动保存。</p>
+      </div>
+
+      <div class="card reading-card">
+        <div class="setting-row">
+          <div>
+            <label for="target-lang">英文译为</label>
+            <p id="target-help">网页翻译目前支持中英互译。英文网页的目标语言使用中文。</p>
+          </div>
+          <input id="target-lang" type="text" placeholder="中文" aria-describedby="target-help"
+            data-preference="targetLang" disabled />
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <label for="auto-translate">自动翻译</label>
+            <p id="auto-help">打开网页后自动开始翻译。</p>
+          </div>
+          <input id="auto-translate" type="checkbox" aria-describedby="auto-help"
+            data-preference="autoTranslate" disabled />
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <label for="highlight-advanced">高亮英语词汇和句型</label>
+            <p id="highlight-help">在英文原文中标出模型识别的较难表达。</p>
+          </div>
+          <input id="highlight-advanced" type="checkbox" aria-describedby="highlight-help"
+            data-preference="highlightAdvanced" disabled />
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <label for="enable-cache">本地翻译缓存</label>
+            <p id="cache-help">保存已翻译的内容，加快重复阅读时的翻译。</p>
+          </div>
+          <input id="enable-cache" type="checkbox" aria-describedby="cache-help"
+            data-preference="enableCache" disabled />
+        </div>
+
+        <div class="reading-footer">
+          <p id="reading-status" class="status" role="status">正在载入设置…</p>
+          <button id="clear-cache" class="button secondary" type="button" disabled>清空翻译缓存</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="area" aria-labelledby="services-title">
+      <div class="section-heading">
+        <h2 id="services-title">翻译服务</h2>
+        <p>可先测试连接，再保存服务配置。</p>
+      </div>
+
+      <div class="card service-default">
+        <div class="setting-row">
+          <label for="default-provider">默认翻译服务</label>
+          <div class="select-control setting-select">
+            <select id="default-provider" data-preference="activeProvider" disabled>
+              <option value="deepseek">DeepSeek</option>
+              <option value="minimax">MiniMax</option>
+            </select>
+          </div>
+        </div>
+        <p id="service-status" class="status" role="status"></p>
+      </div>
+
+      <div class="provider-grid">
+        <form class="card provider-card" data-provider="deepseek" aria-labelledby="ds-title">
+          <div class="provider-heading">
+            <h3 id="ds-title">DeepSeek</h3>
+            <span class="provider-status" id="ds-badge">载入中</span>
+          </div>
+          <fieldset disabled>
+            <div class="field">
+              <label for="ds-key">API Key</label>
+              <div class="control-row">
+                <input id="ds-key" name="apiKey" type="password" placeholder="输入 DeepSeek API Key"
+                  autocomplete="off" spellcheck="false" />
+                <button class="button secondary" id="ds-toggle" type="button" aria-controls="ds-key"
+                  aria-label="显示 DeepSeek API Key">显示</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="ds-base">接口地址</label>
+              <input id="ds-base" name="baseUrl" type="text" inputmode="url"
+                placeholder="https://api.deepseek.com" spellcheck="false" />
+            </div>
+            <div class="field">
+              <label for="ds-model-choice">模型</label>
+              <div class="control-row">
+                <div class="select-control">
+                  <select id="ds-model-choice" class="model-choice" aria-describedby="ds-model-status">
+                    <option>载入中…</option>
+                  </select>
+                </div>
+                <button class="button secondary" id="ds-fetch" type="button" aria-label="获取 DeepSeek 模型">获取列表</button>
+              </div>
+              <div class="manual-model" id="ds-manual-model" hidden>
+                <label for="ds-model">模型 ID</label>
+                <input id="ds-model" name="model" type="text" placeholder="输入模型 ID" spellcheck="false" />
+              </div>
+              <p id="ds-model-status" class="status model-status" role="status"></p>
+            </div>
+            <div class="provider-actions">
+              <button class="button primary" id="ds-save" type="submit">保存配置</button>
+              <button class="button secondary" id="ds-test" type="button">测试连接</button>
+            </div>
+          </fieldset>
+          <p id="ds-status" class="status" role="status"></p>
+        </form>
+
+        <form class="card provider-card" data-provider="minimax" aria-labelledby="mm-title">
+          <div class="provider-heading">
+            <h3 id="mm-title">MiniMax</h3>
+            <span class="provider-status" id="mm-badge">载入中</span>
+          </div>
+          <fieldset disabled>
+            <div class="field">
+              <label for="mm-key">API Key</label>
+              <div class="control-row">
+                <input id="mm-key" name="apiKey" type="password" placeholder="输入 MiniMax API Key"
+                  autocomplete="off" spellcheck="false" />
+                <button class="button secondary" id="mm-toggle" type="button" aria-controls="mm-key"
+                  aria-label="显示 MiniMax API Key">显示</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="mm-base">接口地址</label>
+              <input id="mm-base" name="baseUrl" type="text" inputmode="url"
+                     placeholder="https://api.minimax.cn" spellcheck="false" />
+            </div>
+            <div class="field">
+              <label for="mm-model-choice">模型</label>
+              <div class="control-row">
+                <div class="select-control">
+                  <select id="mm-model-choice" class="model-choice" aria-describedby="mm-model-status">
+                    <option>载入中…</option>
+                  </select>
+                </div>
+                <button class="button secondary" id="mm-fetch" type="button" aria-label="获取 MiniMax 模型">获取列表</button>
+              </div>
+              <div class="manual-model" id="mm-manual-model" hidden>
+                <label for="mm-model">模型 ID</label>
+                <input id="mm-model" name="model" type="text" placeholder="输入模型 ID" spellcheck="false" />
+              </div>
+              <p id="mm-model-status" class="status model-status" role="status"></p>
+            </div>
+            <div class="provider-actions">
+              <button class="button primary" id="mm-save" type="submit">保存配置</button>
+              <button class="button secondary" id="mm-test" type="button">测试连接</button>
+            </div>
+          </fieldset>
+          <p id="mm-status" class="status" role="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="area" id="token-usage" aria-labelledby="usage-title">
+      <div class="section-heading">
+        <h2 id="usage-title">Token 用量与费用</h2>
+        <p>用量和费用记录保存在当前浏览器。</p>
+      </div>
+      <div class="card usage-card">
+        <dl class="usage-summary">
+          <div class="usage-metric usage-total">
+            <dt>累计用量</dt>
+            <dd data-usage="totalTokens">—</dd>
+          </div>
+          <div class="usage-metric">
+            <dt>输入 Token</dt>
+            <dd data-usage="inputTokens">—</dd>
+          </div>
+          <div class="usage-metric">
+            <dt>输出 Token</dt>
+            <dd data-usage="outputTokens">—</dd>
+          </div>
+        </dl>
+        <dl class="usage-cost-overview" aria-label="累计 API 费用">
+          <div>
+            <dt>接口回传费用</dt>
+            <dd data-usage-cost="reported">—</dd>
+          </div>
+          <div>
+            <dt>估算费用</dt>
+            <dd data-usage-cost="estimated">—</dd>
+          </div>
+        </dl>
+        <p class="status usage-cost-note">按公开价估算，各币种独立统计。账单以服务商为准。</p>
+        <p id="usage-cost-status" class="status" role="status"></p>
+        <dl class="usage-providers" aria-label="按服务商统计的 Token 用量">
+          <div>
+            <dt>DeepSeek</dt>
+            <dd>
+              <span data-provider-usage="deepseek">—</span>
+              <span class="usage-provider-cost" data-provider-cost="deepseek" hidden></span>
+            </dd>
+          </div>
+          <div>
+            <dt>MiniMax</dt>
+            <dd>
+              <span data-provider-usage="minimax">—</span>
+              <span class="usage-provider-cost" data-provider-cost="minimax" hidden></span>
+            </dd>
+          </div>
+        </dl>
+        <p id="usage-status" class="status" role="status">正在读取用量…</p>
+      </div>
+      <section class="card usage-card usage-history" aria-labelledby="usage-history-title">
+        <h3 id="usage-history-title">按日用量与费用</h3>
+        <p class="status">按浏览器本地日期统计。</p>
+        <p class="status" id="usage-history-empty" hidden>暂无按日记录。</p>
+        <table class="usage-table" role="table" aria-labelledby="usage-history-title" id="usage-table" hidden>
+          <thead role="rowgroup">
+            <tr role="row">
+              <th role="columnheader" scope="col">日期</th>
+              <th role="columnheader" scope="col">总计</th>
+              <th role="columnheader" scope="col">输入</th>
+              <th role="columnheader" scope="col">输出</th>
+              <th role="columnheader" scope="col">费用</th>
+            </tr>
+          </thead>
+          <tbody id="usage-days" role="rowgroup"></tbody>
+        </table>
+        <nav class="usage-pagination" aria-label="每日用量分页" id="usage-pagination" hidden>
+          <button class="button secondary" id="usage-prev" type="button">上一页</button>
+          <span class="status" id="usage-page" aria-live="polite"></span>
+          <button class="button secondary" id="usage-next" type="button">下一页</button>
+        </nav>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

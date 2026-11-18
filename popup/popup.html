@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>读帖英语</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="header">
+    <span class="logo" aria-hidden="true">译</span>
+    <h1>读帖英语</h1>
+    <button type="button" id="btn-options" class="text-button">设置</button>
+  </header>
+
+  <main>
+    <section class="reading" aria-label="当前页面">
+      <div class="page-head">
+        <span id="page-site">当前页面</span>
+        <span id="page-status" class="state" role="status">正在检查</span>
+      </div>
+      <button type="button" id="page-action" class="primary" aria-disabled="true" aria-describedby="page-help">
+        正在检查…
+      </button>
+      <p id="page-help" class="help" hidden></p>
+
+      <fieldset id="mode-group" aria-describedby="mode-help" disabled>
+        <legend class="sr-only">阅读模式</legend>
+        <div class="mode-options">
+          <label class="mode-option">
+            <input type="radio" name="mode" value="study" checked />
+            <span>先读原文</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" name="mode" value="bilingual" />
+            <span>双语对照</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" name="mode" value="translation" />
+            <span>仅译文</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" name="mode" value="original" />
+            <span>仅原文</span>
+          </label>
+        </div>
+      </fieldset>
+      <p id="mode-help" class="help" aria-live="polite">遇到读不懂的英文，再查看译文。</p>
+    </section>
+
+    <button type="button" id="btn-x-expressions" class="compose" hidden>
+      <span class="compose-label">我的表达</span>
+      <span class="compose-hint">收藏与复习</span>
+      <span class="compose-arrow" aria-hidden="true">↗</span>
+    </button>
+    <button type="button" id="btn-compose" class="compose">
+      <span class="compose-label">写 X 帖文</span>
+      <span class="compose-hint">中文转英文</span>
+      <span class="compose-arrow" aria-hidden="true">↗</span>
+    </button>
+    <p id="action-error" class="help error" role="alert" hidden></p>
+  </main>
+
+  <footer>
+    <div class="provider-row">
+      <label for="provider-select">引擎</label>
+      <div class="select-control">
+        <select id="provider-select" disabled>
+          <option value="deepseek">DeepSeek</option>
+          <option value="minimax">MiniMax</option>
+        </select>
+      </div>
+    </div>
+    <span id="shortcut" class="shortcut" hidden>切换 <kbd id="shortcut-key"></kbd></span>
+    <button type="button" id="token-usage" class="usage-link">Token 用量</button>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
