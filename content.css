@@ -1,15 +1,14 @@
-/* 译文沿用站点文字颜色，并用左边线和留白区分层级。 */
 .tr-target-block {
   display: block;
   box-sizing: border-box;
-  border-inline-start: 2px solid currentColor;
-  margin: .45em 0 .75em;
-  padding: .08em 0 .08em .72em;
+  margin: .4em 0 .65em;
+  padding: 0;
   min-width: 0;
   color: var(--tr-source-color, inherit);
-  font-size: .93em;
+  font-size: var(--tr-source-font-size, inherit);
   line-height: 1.55;
   text-align: start;
+  text-indent: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -18,16 +17,17 @@
   opacity: .75;
 }
 
+.tr-target-block > .tr-target-text {
+  font-size: inherit;
+  text-indent: inherit;
+}
+
 .tr-target-block.tr-study {
-  border-inline-start-color: transparent;
-  padding-inline-start: 0;
   margin: .25em 0 .5em;
 }
 
 .tr-study .tr-target-text {
-  border-inline-start: 2px solid currentColor;
   margin-block-start: .45em;
-  padding-inline-start: .72em;
 }
 
 .tr-target-block .tr-target-text[hidden],

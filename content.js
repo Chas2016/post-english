@@ -111,7 +111,7 @@
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'sync') return;
-      for (const key of ['activeProvider', 'providers', 'targetLang', 'enableCache', 'highlightAdvanced']) {
+      for (const key of ['activeProvider', 'providers', 'targetLang', 'enableCache', 'cacheRetentionDays', 'highlightAdvanced']) {
         if (changes[key]) state.config[key] = changes[key].newValue;
       }
       if (changes.targetLang) {
@@ -676,7 +676,9 @@
     target.append(textNode);
 
     const cell = block.el.matches('td, th');
-    target.style.setProperty('--tr-source-color', getComputedStyle(block.el).color);
+    const sourceStyle = getComputedStyle(block.el);
+    target.style.setProperty('--tr-source-color', sourceStyle.color);
+    target.style.setProperty('--tr-source-font-size', sourceStyle.fontSize);
     if (cell) block.el.append(target);
     else block.el.after(target);
 

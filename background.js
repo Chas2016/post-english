@@ -25,6 +25,7 @@ const DEFAULT_CONFIG = {
 
   // 是否启用本地翻译缓存（按站点 + 目标语言 + 内容 hash 为 key）
   enableCache: true,
+  cacheRetentionDays: 30,
 
   // 是否高亮英文中的高级词汇 / 句型
   highlightAdvanced: false,
@@ -54,6 +55,11 @@ const NANOS_PER_UNIT = 1_000_000_000;
 const X_LEARN_ITEMS_KEY = 'xLearnItems';
 const X_LEARN_CACHE_KEY = 'xLearnCache';
 const X_LEARN_CACHE_VERSION = { analysis: 2, review: 1 };
+const CACHE_HITS_KEY = 'localCacheHits';
+const CACHE_CLEANUP_ALARM = 'local-cache-cleanup';
+const CACHE_RETENTION_DAYS = [0, 7, 30, 90];
+const MAX_TRANSLATION_CACHE_ITEMS = 5000;
+const MAX_LEARNING_CACHE_ITEMS = 80;
 const X_LEARN_POST_LIMIT = 5000;
 const X_LEARN_SOURCE_LIMIT = 3;
 const X_LEARN_CONTEXT_LIMIT = 7500;
@@ -83,8 +89,8 @@ let pendingConfigSave = Promise.resolve();
 let pendingUsageSave = Promise.resolve();
 let pendingBadgeRefresh = Promise.resolve();
 let pendingLearnWrite = Promise.resolve();
-let pendingLearnCacheWrite = Promise.resolve();
-let learnCacheGeneration = 0;
+let pendingCacheOperation = Promise.resolve();
+let cacheGeneration = 0;
 const inFlightLearnRequests = new Map();
 let lastBadgeTitle = '';
 let lastBadgeDate = '';
@@ -92,6 +98,7 @@ let lastBadgeDate = '';
 chrome.runtime.onInstalled.addListener((details) => {
   const migration = pendingConfigSave.then(() => updateInstalledConfig(details));
   pendingConfigSave = migration.catch((error) => console.warn('扩展配置更新失败', error.message));
+  cleanExpiredCache();
   // 注册右键菜单
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
@@ -120,10 +127,20 @@ chrome.commands.onCommand.addListener((command, tab) => {
 });
 
 chrome.runtime.onStartup.addListener(refreshUsageBadge);
+chrome.runtime.onStartup.addListener(cleanExpiredCache);
 chrome.alarms.onAlarm.addListener(({ name }) => {
   if (name === MIDNIGHT_ALARM) refreshUsageBadge();
+  if (name === CACHE_CLEANUP_ALARM) cleanExpiredCache();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'sync') return;
+  if (changes.enableCache?.newValue === false) cacheGeneration++;
+  if (changes.cacheRetentionDays) cleanExpiredCache();
 });
 refreshUsageBadge();
+chrome.alarms.get(CACHE_CLEANUP_ALARM)
+  .then(alarm => alarm || chrome.alarms.create(CACHE_CLEANUP_ALARM, { periodInMinutes: 1440 }))
+  .catch(error => console.warn('缓存清理计划创建失败', error.message));
 
 // 统一消息入口
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -153,6 +170,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       analyzeAdvanced(msg.texts, msg.config)
         .then((groups) => sendResponse({ ok: true, groups }))
         .catch((err) => sendResponse({ ok: false, error: String(err && err.message || err) }));
+      return true;
+
+    case 'GET_CACHE_STATS':
+      getCacheStats()
+        .then((stats) => sendResponse({ ok: true, stats }))
+        .catch((err) => sendResponse({ ok: false, error: err.message }));
       return true;
 
     case 'CLEAR_CACHE':
@@ -218,6 +241,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // 执行翻译：返回与输入等长的译文数组
 // targets（可选）：与 texts 等长，每项为目标语言（如 '中文' / '英文'）；缺省时统一用 config.targetLang
 async function doTranslate(texts, config, host, targets) {
+  const generation = cacheGeneration;
   const cfg = mergeConfig(config);
   const provider = cfg.providers[cfg.activeProvider] || cfg.providers.deepseek;
   if (!provider.apiKey) {
@@ -237,51 +261,39 @@ async function doTranslate(texts, config, host, targets) {
 
   for (const [target, indices] of byTarget) {
     const subTexts = indices.map((i) => texts[i]);
-    const subResults = await translateByTarget(subTexts, provider, cfg, site, target);
+    const subResults = await translateByTarget(subTexts, provider, cfg, site, target, generation);
     indices.forEach((origIdx, j) => { results[origIdx] = subResults[j]; });
   }
   return results;
 }
 
 // 按单一目标语言翻译一组文本（含缓存读写）
-async function translateByTarget(texts, provider, cfg, site, target) {
+async function translateByTarget(texts, provider, cfg, site, target, generation) {
   const results = new Array(texts.length).fill('');
   const pending = [];
+  const keys = cfg.enableCache && site ? texts.map(text => cacheKey(site, target, text)) : [];
+  const cached = await readCache(keys, generation);
+  const now = Date.now();
 
-  // 1) 查缓存
-  if (cfg.enableCache && site) {
-    const keys = texts.map((t) => cacheKey(site, target, t));
-    const hit = await chrome.storage.local.get(keys);
-    for (let i = 0; i < texts.length; i++) {
-      const v = hit[keys[i]];
-      if (typeof v === 'string') results[i] = v;
-      else pending.push(i);
-    }
-  } else {
-    for (let i = 0; i < texts.length; i++) pending.push(i);
+  for (let i = 0; i < texts.length; i++) {
+    const entry = cached[keys[i]];
+    const value = typeof entry === 'string' ? entry : entry?.translation;
+    if (typeof value === 'string' && value && !cacheExpired(entry, cfg.cacheRetentionDays, now)) results[i] = value;
+    else pending.push(i);
   }
+  await countCacheHits(texts.length - pending.length);
 
-  // 2) 未命中走 API
-  if (pending.length > 0) {
-    const pendingTexts = pending.map((i) => texts[i]);
-    const translated = await translateViaApi(pendingTexts, provider, cfg, target);
+  if (!pending.length) return results;
+  const translated = await translateViaApi(pending.map(i => texts[i]), provider, cfg, target);
+  const storedAt = Date.now();
+  const entries = {};
+  pending.forEach((index, i) => {
+    const translation = translated[i];
+    results[index] = translation;
+    if (keys.length && translation) entries[keys[index]] = { translation, storedAt };
+  });
 
-    // 3) 写回缓存
-    if (cfg.enableCache && site) {
-      const toStore = {};
-      pending.forEach((origIdx, j) => {
-        const t = translated[j];
-        results[origIdx] = t;
-        if (t) toStore[cacheKey(site, target, texts[origIdx])] = t;
-      });
-      if (Object.keys(toStore).length > 0) {
-        await chrome.storage.local.set(toStore);
-        trimCacheIfNeeded();
-      }
-    } else {
-      pending.forEach((origIdx, j) => { results[origIdx] = translated[j]; });
-    }
-  }
+  if (Object.keys(entries).length) await saveTranslationCache(entries, generation);
   return results;
 }
 
@@ -629,6 +641,7 @@ async function explainXPost(msg) {
 }
 
 async function requestXLearn(kind, input, prompt, validate) {
+  const generation = cacheGeneration;
   const config = await readConfig();
   const name = config.activeProvider;
   const provider = config.providers[name];
@@ -640,40 +653,42 @@ async function requestXLearn(kind, input, prompt, validate) {
   const requestKey = [X_LEARN_CACHE_VERSION[kind], kind, name, provider.baseUrl, provider.model, request];
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(requestKey)));
   const key = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  const cacheGeneration = learnCacheGeneration;
-  const cacheState = config.enableCache ? await chrome.storage.local.get(X_LEARN_CACHE_KEY).catch(() => ({})) : {};
+  const cacheState = await readCache(config.enableCache ? [X_LEARN_CACHE_KEY] : [], generation);
   const cached = cacheState[X_LEARN_CACHE_KEY]?.[key];
-  if (cacheGeneration === learnCacheGeneration && cached?.expiresAt > Date.now()) return cached.result;
-  const pending = inFlightLearnRequests.get(key);
+  if (cached && !cacheExpired(cached, config.cacheRetentionDays, Date.now())) {
+    await countCacheHits(1);
+    return cached.result;
+  }
+  const requestId = generation + ':' + key;
+  const pending = inFlightLearnRequests.get(requestId);
   if (pending) return pending;
 
   const run = (async () => {
     const { content } = await callProvider(provider, name, prompt, request);
     const result = validate(parseXLearnJson(content), input);
-    if (config.enableCache && cacheGeneration === learnCacheGeneration) await cacheXLearnResult(key, result);
+    if (config.enableCache) await cacheXLearnResult(key, result, generation);
     return result;
   })();
-  inFlightLearnRequests.set(key, run);
+  inFlightLearnRequests.set(requestId, run);
   try {
     return await run;
   } finally {
-    inFlightLearnRequests.delete(key);
+    inFlightLearnRequests.delete(requestId);
   }
 }
 
-function cacheXLearnResult(key, result) {
-  const write = pendingLearnCacheWrite.then(async () => {
+function cacheXLearnResult(key, result, generation) {
+  return runCacheOperation(async () => {
+    if (generation !== cacheGeneration) return;
     const stored = await chrome.storage.local.get(X_LEARN_CACHE_KEY);
     const now = Date.now();
     const entries = Object.entries(stored[X_LEARN_CACHE_KEY] || {})
-      .filter(([id, entry]) => id !== key && entry?.expiresAt > now)
-      .slice(-79);
+      .filter(([id]) => id !== key)
+      .slice(1 - MAX_LEARNING_CACHE_ITEMS);
     const cache = Object.fromEntries(entries);
-    cache[key] = { expiresAt: now + 7 * X_LEARN_DAY_MS, result };
+    cache[key] = { storedAt: now, result };
     await chrome.storage.local.set({ [X_LEARN_CACHE_KEY]: cache });
-  });
-  pendingLearnCacheWrite = write.catch(() => {});
-  return pendingLearnCacheWrite;
+  }).catch(() => {});
 }
 
 function normalizeXLearnPost(post) {
@@ -1149,35 +1164,106 @@ function hash(str) {
   return (h >>> 0).toString(16);
 }
 
-// 清空本地翻译缓存，返回清除条数
-async function clearCache() {
-  const all = await chrome.storage.local.get(null);
-  const keys = Object.keys(all).filter((k) => k.startsWith('tr:'));
-  learnCacheGeneration++;
-  const clearLearnCache = pendingLearnCacheWrite.then(async () => {
-    const stored = await chrome.storage.local.get(X_LEARN_CACHE_KEY);
-    const count = Object.keys(stored[X_LEARN_CACHE_KEY] || {}).length;
-    if (count) await chrome.storage.local.remove(X_LEARN_CACHE_KEY);
-    return count;
-  });
-  pendingLearnCacheWrite = clearLearnCache.catch(() => {});
-  if (keys.length > 0) {
-    await chrome.storage.local.remove(keys);
-  }
-  return keys.length + await clearLearnCache;
+function runCacheOperation(task) {
+  const operation = pendingCacheOperation.then(task);
+  pendingCacheOperation = operation.catch(() => {});
+  return operation;
 }
 
-// 缓存条数超过上限时，清空全部缓存（简单兜底，避免无限膨胀）
-const MAX_CACHE_ITEMS = 5000;
-async function trimCacheIfNeeded() {
+async function readCache(keys, generation) {
+  if (!keys.length) return {};
+  await pendingCacheOperation;
+  const stored = await chrome.storage.local.get(keys).catch(() => ({}));
+  return generation === cacheGeneration ? stored : {};
+}
+
+function cacheStoredAt(entry) {
+  if (typeof entry?.storedAt === 'number') return entry.storedAt;
+  if (typeof entry?.expiresAt === 'number') return entry.expiresAt - 7 * X_LEARN_DAY_MS;
+  return null;
+}
+
+function cacheExpired(entry, days, now) {
+  const storedAt = cacheStoredAt(entry);
+  return days > 0 && storedAt !== null && storedAt <= now - days * X_LEARN_DAY_MS;
+}
+
+async function countCacheHits(count) {
+  if (!count) return;
+  await runCacheOperation(async () => {
+    const stored = await chrome.storage.local.get(CACHE_HITS_KEY);
+    await chrome.storage.local.set({ [CACHE_HITS_KEY]: (stored[CACHE_HITS_KEY] || 0) + count });
+  }).catch(() => {});
+}
+
+function isTranslationCacheKey(key) {
+  return key.startsWith('tr:');
+}
+
+function saveTranslationCache(entries, generation) {
+  return runCacheOperation(async () => {
+    if (generation !== cacheGeneration) return;
+    await chrome.storage.local.set(entries);
+    const storage = chrome.storage.local;
+    const keys = storage.getKeys ? await storage.getKeys() : Object.keys(await storage.get(null));
+    const translationKeys = keys.filter(isTranslationCacheKey);
+    const excess = translationKeys.length - MAX_TRANSLATION_CACHE_ITEMS;
+    if (excess <= 0) return;
+    const stored = await storage.get(translationKeys);
+    translationKeys.sort((a, b) => (cacheStoredAt(stored[a]) ?? 0) - (cacheStoredAt(stored[b]) ?? 0));
+    await storage.remove(translationKeys.slice(0, excess));
+  }).catch(() => {});
+}
+
+function getCacheStats() {
+  return runCacheOperation(async () => {
+    const stored = await chrome.storage.local.get(null);
+    const keys = Object.keys(stored).filter(isTranslationCacheKey);
+    const entries = keys.length + Object.keys(stored[X_LEARN_CACHE_KEY] || {}).length;
+    if (Object.hasOwn(stored, X_LEARN_CACHE_KEY)) keys.push(X_LEARN_CACHE_KEY);
+    const bytes = keys.length ? await chrome.storage.local.getBytesInUse(keys) : 0;
+    return { entries, bytes, hits: stored[CACHE_HITS_KEY] || 0 };
+  });
+}
+
+function clearCache() {
+  cacheGeneration++;
+  return runCacheOperation(async () => {
+    const stored = await chrome.storage.local.get(null);
+    const keys = Object.keys(stored).filter(isTranslationCacheKey);
+    const count = keys.length + Object.keys(stored[X_LEARN_CACHE_KEY] || {}).length;
+    if (Object.hasOwn(stored, X_LEARN_CACHE_KEY)) keys.push(X_LEARN_CACHE_KEY);
+    if (keys.length) await chrome.storage.local.remove(keys);
+    return count;
+  });
+}
+
+async function cleanExpiredCache() {
   try {
-    const all = await chrome.storage.local.get(null);
-    const keys = Object.keys(all).filter((k) => k.startsWith('tr:'));
-    if (keys.length > MAX_CACHE_ITEMS) {
-      await chrome.storage.local.remove(keys);
-    }
-  } catch (e) {
-    // 忽略清理失败
+    await runCacheOperation(async () => {
+      const { cacheRetentionDays } = await readConfig();
+      if (!cacheRetentionDays) return;
+      const storage = chrome.storage.local;
+      const stored = await storage.get(null);
+      const now = Date.now();
+      const remove = [];
+      const update = {};
+      for (const [key, entry] of Object.entries(stored)) {
+        if (!isTranslationCacheKey(key)) continue;
+        if (cacheExpired(entry, cacheRetentionDays, now)) remove.push(key);
+        else if (typeof entry === 'string') update[key] = { translation: entry, storedAt: now };
+      }
+      const learning = Object.entries(stored[X_LEARN_CACHE_KEY] || {});
+      const remaining = learning.filter(([, entry]) => !cacheExpired(entry, cacheRetentionDays, now));
+      if (remaining.length !== learning.length) {
+        if (remaining.length) update[X_LEARN_CACHE_KEY] = Object.fromEntries(remaining);
+        else remove.push(X_LEARN_CACHE_KEY);
+      }
+      if (remove.length) await storage.remove(remove);
+      if (Object.keys(update).length) await storage.set(update);
+    });
+  } catch (error) {
+    console.warn('自动清理缓存失败', error.message);
   }
 }
 
@@ -1300,10 +1386,16 @@ function mergeConfig(stored) {
   if (!Object.hasOwn(merged.providers, merged.activeProvider)) {
     merged.activeProvider = DEFAULT_CONFIG.activeProvider;
   }
+  if (!CACHE_RETENTION_DAYS.includes(merged.cacheRetentionDays)) {
+    merged.cacheRetentionDays = DEFAULT_CONFIG.cacheRetentionDays;
+  }
   return merged;
 }
 
 async function saveConfig(partial) {
+  if (partial.cacheRetentionDays !== undefined && !CACHE_RETENTION_DAYS.includes(partial.cacheRetentionDays)) {
+    throw new Error('请选择有效的缓存保留时间');
+  }
   const current = mergeConfig(await chrome.storage.sync.get(null));
   const updates = {};
   for (const key of Object.keys(DEFAULT_CONFIG)) {

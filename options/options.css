@@ -1,19 +1,21 @@
 /* options.css — 插件设置 */
 :root {
   color-scheme: light dark;
-  --background: #f3f7f7;
+  --background: #f3f5f8;
   --surface: #fff;
-  --text: #152b2c;
-  --muted: #486263;
-  --accent: #0d625a;
-  --accent-hover: #084d47;
-  --accent-soft: #e1f2ef;
-  --line: #d5e2e0;
-  --input-line: #a8bdb9;
-  --control-muted: #e9f1ef;
+  --text: #182437;
+  --muted: #526176;
+  --accent: #285588;
+  --accent-hover: #204574;
+  --accent-soft: #eaf1fb;
+  --accent-text: #fff;
+  --line: #dce3ed;
+  --input-line: #8292a7;
+  --control-muted: #e6ebf2;
   --switch-thumb: #fff;
-  --surface-shadow: 0 1px 3px #17303210;
-  --danger: #982f24;
+  --surface-shadow: 0 1px 3px #111e3110;
+  --success: #216749;
+  --danger: #a12b32;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
 }
@@ -94,6 +96,14 @@ h3 {
 .reading-card,
 .service-default {
   padding-inline: 22px;
+}
+
+.reading-status:not(:empty) {
+  padding-block-end: 12px;
+}
+
+.cache-card {
+  padding: 18px 22px 0;
 }
 
 .setting-row {
@@ -177,6 +187,10 @@ input::placeholder {
   width: min(21rem, 50vw);
 }
 
+.cache-card .setting-row .setting-select {
+  width: min(10rem, 40vw);
+}
+
 input[type='checkbox'] {
   appearance: none;
   display: inline-flex;
@@ -229,7 +243,7 @@ input[type='checkbox']:checked {
 }
 
 .status[data-state='success'] {
-  color: var(--accent);
+  color: var(--success);
 }
 
 .service-default {
@@ -465,7 +479,7 @@ input[type='checkbox']:checked {
 }
 
 .provider-status.configured {
-  color: var(--accent);
+  color: var(--success);
 }
 
 .provider-status.configured::before {
@@ -539,7 +553,7 @@ fieldset {
 
 .button.primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
 }
 
 .button.primary:hover:not(:disabled) {
@@ -564,22 +578,20 @@ fieldset {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #142020;
-    --surface: #1c2a2a;
-    --text: #eef8f5;
-    --muted: #bed1cc;
-    --accent: #a1e1ce;
-    --accent-hover: #b8e8da;
-    --accent-soft: #294641;
-    --line: #354747;
-    --input-line: #617c78;
-    --control-muted: #2c3d3d;
-    --danger: #ffb5aa;
+    --background: #111825;
+    --surface: #1b2534;
+    --text: #eef3fa;
+    --muted: #b9c6d8;
+    --accent: #98c1ff;
+    --accent-hover: #b5d2ff;
+    --accent-soft: #273b56;
+    --accent-text: #132640;
+    --line: #344359;
+    --input-line: #6e819b;
+    --control-muted: #2a374a;
+    --success: #8bdcb6;
+    --danger: #ffb3b8;
     --surface-shadow: none;
-  }
-
-  .button.primary {
-    color: #132828;
   }
 }
 

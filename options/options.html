@@ -47,19 +47,7 @@
             data-preference="highlightAdvanced" disabled />
         </div>
 
-        <div class="setting-row">
-          <div>
-            <label for="enable-cache">本地翻译缓存</label>
-            <p id="cache-help">保存已翻译的内容，加快重复阅读时的翻译。</p>
-          </div>
-          <input id="enable-cache" type="checkbox" aria-describedby="cache-help"
-            data-preference="enableCache" disabled />
-        </div>
-
-        <div class="reading-footer">
-          <p id="reading-status" class="status" role="status">正在载入设置…</p>
-          <button id="clear-cache" class="button secondary" type="button" disabled>清空翻译缓存</button>
-        </div>
+        <p id="reading-status" class="status reading-status" role="status">正在载入设置…</p>
       </div>
     </section>
 
@@ -170,6 +158,56 @@
           </fieldset>
           <p id="mm-status" class="status" role="status"></p>
         </form>
+      </div>
+    </section>
+
+    <section class="area" id="local-cache" aria-labelledby="cache-title">
+      <div class="section-heading">
+        <h2 id="cache-title">本地缓存</h2>
+        <p>网页译文、X 解读和复习题保存在当前浏览器。</p>
+      </div>
+      <div class="card cache-card">
+        <dl class="usage-summary">
+          <div class="usage-metric usage-total">
+            <dt>累计命中次数</dt>
+            <dd data-cache-stat="hits">—</dd>
+          </div>
+          <div class="usage-metric">
+            <dt>缓存条目</dt>
+            <dd data-cache-stat="entries">—</dd>
+          </div>
+          <div class="usage-metric">
+            <dt>占用空间</dt>
+            <dd data-cache-stat="bytes">—</dd>
+          </div>
+        </dl>
+        <p id="cache-stats-status" class="status" role="status"></p>
+        <div class="setting-row">
+          <div>
+            <label for="enable-cache">使用本地缓存</label>
+            <p id="cache-help">关闭后停止读取和写入缓存。</p>
+          </div>
+          <input id="enable-cache" type="checkbox" aria-describedby="cache-help"
+            data-preference="enableCache" disabled />
+        </div>
+        <div class="setting-row">
+          <div>
+            <label for="cache-retention">自动清理</label>
+            <p id="cache-retention-help">按写入时间保留缓存，到期后定期清理。</p>
+          </div>
+          <div class="select-control setting-select">
+            <select id="cache-retention" data-preference="cacheRetentionDays" aria-describedby="cache-retention-help" disabled>
+              <option value="7">保留 7 天</option>
+              <option value="30">保留 30 天</option>
+              <option value="90">保留 90 天</option>
+              <option value="0">不按时间清理</option>
+            </select>
+          </div>
+        </div>
+        <div class="reading-footer">
+          <p id="cache-status" class="status" role="status"></p>
+          <button id="clear-cache" class="button secondary" type="button" disabled>清空缓存</button>
+        </div>
       </div>
     </section>
 

@@ -29,11 +29,16 @@
   const usagePrev = $('usage-prev');
   const usageNext = $('usage-next');
   const usagePage = $('usage-page');
+  const cacheMetrics = document.querySelectorAll('[data-cache-stat]');
+  const cacheStatus = $('cache-status');
+  const bytesFormat = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 });
   const daysPerPage = 7;
   let historyDays = [];
   let todayDate = '';
   let historyPage = 0;
   let usageRevision = 0;
+  let cacheRevision = 0;
+  let cacheRefreshTimer;
   let config;
 
   function setStatus(status, message, state = '') {
@@ -186,6 +191,29 @@
     }
   }
 
+  async function refreshCacheStats() {
+    const revision = ++cacheRevision;
+    const status = $('cache-stats-status');
+    try {
+      const { stats } = await request({ type: 'GET_CACHE_STATS' });
+      if (revision !== cacheRevision) return;
+      for (const metric of cacheMetrics) {
+        const key = metric.dataset.cacheStat;
+        const value = stats[key];
+        metric.textContent = numberFormat.format(value);
+        if (key === 'bytes') {
+          const [amount, unit] = value >= 1024 ** 2 ? [value / 1024 ** 2, 'MiB'] :
+            value >= 1024 ? [value / 1024, 'KiB'] : [value, 'B'];
+          metric.textContent = bytesFormat.format(amount) + ' ' + unit;
+          metric.title = numberFormat.format(value) + ' 字节';
+        }
+      }
+      setStatus(status, '');
+    } catch {
+      if (revision === cacheRevision) setStatus(status, '暂时无法读取缓存统计。', 'error');
+    }
+  }
+
   function renderPreference(input, value) {
     if (input.type === 'checkbox') input.checked = Boolean(value);
     else input.value = value;
@@ -196,14 +224,17 @@
 
   function bindPreference(input) {
     const key = input.dataset.preference;
-    const status = $(key === 'activeProvider' ? 'service-status' : 'reading-status');
+    const status = key === 'enableCache' || key === 'cacheRetentionDays' ? cacheStatus :
+      $(key === 'activeProvider' ? 'service-status' : 'reading-status');
     let revision = 0;
 
     input.addEventListener('change', async () => {
       const saveRevision = ++revision;
       const readInput = () => input.type === 'checkbox' ? input.checked : input.value;
       const draft = readInput();
-      const value = input.type === 'checkbox' ? draft : draft.trim() || '中文';
+      let value = draft;
+      if (key === 'cacheRetentionDays') value = Number(draft);
+      if (key === 'targetLang') value = draft.trim() || '中文';
       setStatus(status, '正在保存…');
       try {
         const response = await request({ type: 'SAVE_CONFIG', config: { [key]: value } });
@@ -412,14 +443,14 @@
 
   const clearCache = $('clear-cache');
   clearCache.addEventListener('click', async () => {
-    const status = $('reading-status');
     clearCache.disabled = true;
-    setStatus(status, '正在清空翻译缓存…');
+    setStatus(cacheStatus, '正在清空缓存…');
     try {
       const response = await request({ type: 'CLEAR_CACHE' });
-      setStatus(status, '已清空 ' + response.count + ' 条缓存。', 'success');
+      setStatus(cacheStatus, '已清空 ' + response.count + ' 条缓存。', 'success');
+      await refreshCacheStats();
     } catch (error) {
-      setStatus(status, '清空缓存失败：' + error.message, 'error');
+      setStatus(cacheStatus, '清空缓存失败：' + error.message, 'error');
     } finally {
       clearCache.disabled = false;
     }
@@ -444,7 +475,12 @@
   }
 
   chrome.storage?.onChanged?.addListener((changes, area) => {
-    if (area === 'local' && (changes.tokenUsage || changes.tokenUsageByDay)) refreshUsage();
+    if (area !== 'local') return;
+    if (changes.tokenUsage || changes.tokenUsageByDay) refreshUsage();
+    if (changes.localCacheHits || changes.xLearnCache || Object.keys(changes).some(key => key.startsWith('tr:'))) {
+      clearTimeout(cacheRefreshTimer);
+      cacheRefreshTimer = setTimeout(refreshCacheStats, 120);
+    }
   });
   usagePrev.addEventListener('click', () => {
     historyPage--;
@@ -455,6 +491,8 @@
     renderUsageHistory();
   });
   window.addEventListener('focus', refreshUsage);
+  window.addEventListener('focus', refreshCacheStats);
   refreshUsage();
+  refreshCacheStats();
   init();
 })();

@@ -49,6 +49,9 @@ function memoryStorage(initial = {}) {
       return Object.fromEntries(names.filter((name) => Object.hasOwn(data, name))
         .map((name) => [name, structuredClone(data[name])]));
     },
+    async getBytesInUse(keys) {
+      return keys.reduce((total, key) => total + Buffer.byteLength(key) + Buffer.byteLength(JSON.stringify(data[key])), 0);
+    },
     async set(values) {
       await new Promise((resolve) => setImmediate(resolve));
       Object.assign(data, structuredClone(values));
@@ -73,6 +76,8 @@ function worker(respond, config) {
   const requests = [];
   const event = { addListener() {} };
   let listener;
+  let onAlarm;
+  let onStorageChange;
   let opened = 0;
   const chrome = {
     runtime: {
@@ -81,10 +86,10 @@ function worker(respond, config) {
       onMessage: { addListener: (value) => { listener = value; } },
       async openOptionsPage() { opened++; }
     },
-    alarms: { onAlarm: event, async get() {}, async create() {} },
+    alarms: { onAlarm: { addListener: value => { onAlarm = value; } }, async get() {}, async create() {} },
     contextMenus: { onClicked: event },
     commands: { onCommand: event },
-    storage: { sync, local },
+    storage: { sync, local, onChanged: { addListener: value => { onStorageChange = value; } } },
     action: { async setBadgeText() {}, async setBadgeBackgroundColor() {}, async setTitle() {} }
   };
   vm.runInNewContext(background, {
@@ -92,7 +97,8 @@ function worker(respond, config) {
     async fetch(url, options) {
       const payload = JSON.parse(options.body);
       const [prompt, input] = payload.messages;
-      const request = { url, prompt: prompt.content, input: JSON.parse(input.content) };
+      const request = { url, prompt: prompt.content, input: prompt.content.startsWith('你是一名资深专业翻译')
+        ? input.content : JSON.parse(input.content) };
       requests.push(request);
       const output = await respond(request);
       return {
@@ -108,6 +114,11 @@ function worker(respond, config) {
   }, { filename: 'background.js' });
   return {
     local, sync, requests, opened: () => opened,
+    runCleanup: () => onAlarm({ name: 'local-cache-cleanup' }),
+    changeSetting: async (key, value) => {
+      await sync.set({ [key]: value });
+      onStorageChange({ [key]: { newValue: value } }, 'sync');
+    },
     async request(type, data) {
       return new Promise((resolve) => {
         assert.equal(listener({ type, ...data }, {}, (result) => resolve(structuredClone(result))), true);
@@ -122,6 +133,78 @@ const explainInput = {
   sources: [{ id: '456', text: parentText, relation: 'parent' }],
   includeChinese: false
 };
+
+test('缓存空间只计缓存内容，并发命中和手动清空保留历史计数', async () => {
+  const app = worker(({ input }) => typeof input === 'string' ? '示例译文' : getAnalysis());
+  const config = await app.request('GET_CONFIG');
+  const translate = {
+    config,
+    host: 'www.x.com',
+    texts: ['The beta is going well.'],
+    targets: ['中文']
+  };
+  const result = { ok: true, translations: ['示例译文'] };
+  assert.deepEqual(await app.request('DO_TRANSLATE', translate), result);
+  assert.equal((await app.request('X_LEARN_EXPLAIN', explainInput)).ok, true);
+  for (const hit of await Promise.all(Array.from({ length: 3 }, () => app.request('DO_TRANSLATE', translate)))) {
+    assert.deepEqual(hit, result);
+  }
+  assert.equal((await app.request('X_LEARN_EXPLAIN', explainInput)).ok, true);
+  assert.equal(app.requests.length, 2);
+  const keys = Object.keys(app.local.data).filter(key => key.startsWith('tr:') || key === 'xLearnCache');
+  assert.deepEqual((await app.request('GET_CACHE_STATS')).stats, {
+    hits: 4, entries: 3, bytes: await app.local.getBytesInUse(keys)
+  });
+  assert.deepEqual(await app.request('CLEAR_CACHE'), { ok: true, count: 3 });
+  assert.deepEqual((await app.request('GET_CACHE_STATS')).stats, { hits: 4, entries: 0, bytes: 0 });
+  assert.equal((await app.request('GET_TOKEN_USAGE')).usage.requestCount, 2);
+});
+
+test('定时清理按保留时间删除到期条目，兼容旧缓存和关闭按时间清理', async () => {
+  const app = worker(() => assert.fail('清理缓存不应请求模型'));
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  await app.local.set({
+    'tr:x.com:中文:expired': { translation: '旧译文', storedAt: now - 8 * day },
+    'tr:x.com:中文:fresh': { translation: '新译文', storedAt: now },
+    xLearnCache: {
+      expired: { expiresAt: now - day, result: {} },
+      fresh: { storedAt: now, result: {} }
+    },
+    xLearnItems: [{ id: 'saved' }]
+  });
+  assert.equal((await app.request('GET_CONFIG')).cacheRetentionDays, 30);
+  assert.equal((await app.request('SAVE_CONFIG', { config: { cacheRetentionDays: -1 } })).ok, false);
+  await app.changeSetting('cacheRetentionDays', 0);
+  app.runCleanup();
+  assert.equal((await app.request('GET_CACHE_STATS')).stats.entries, 5);
+
+  await app.changeSetting('cacheRetentionDays', 7);
+  assert.equal((await app.request('GET_CACHE_STATS')).stats.entries, 3);
+  assert.equal(app.local.data['tr:x.com:中文:expired'], undefined);
+  assert.equal(app.local.data['tr:x.com:中文:old'].translation, '旧译文');
+  assert.ok(app.local.data['tr:x.com:中文:old'].storedAt >= now);
+  assert.deepEqual(Object.keys(app.local.data.xLearnCache), ['fresh']);
+  assert.deepEqual(app.local.data.xLearnItems, [{ id: 'saved' }]);
+});
+
+test('手动清空后，正在生成的译文不会写回旧缓存', async () => {
+  let start;
+  let finish;
+  const started = new Promise(resolve => { start = resolve; });
+  const model = new Promise(resolve => { finish = resolve; });
+  const app = worker(() => {
+    start();
+    return model;
+  });
+  const config = await app.request('GET_CONFIG');
+  const pending = app.request('DO_TRANSLATE', { config, host: 'x.com', texts: ['We went live.'] });
+  await started;
+  assert.equal((await app.request('CLEAR_CACHE')).ok, true);
+  finish('已经上线。');
+  assert.deepEqual(await pending, { ok: true, translations: ['已经上线。'] });
+  assert.deepEqual((await app.request('GET_CACHE_STATS')).stats, { hits: 0, entries: 0, bytes: 0 });
+});
 
 test('X 讲解锚定原文，复用同一请求和缓存，并记录服务用量', async () => {
   const app = worker(({ prompt, input }) => {
