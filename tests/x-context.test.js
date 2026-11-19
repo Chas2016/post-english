@@ -182,11 +182,13 @@ test('X learning context in real Chromium DOM', { skip: chrome ? false : 'Set CH
   const source = readFileSync(path.join(__dirname, '..', 'x-context.js'), 'utf8');
   writeFileSync(fixture, `<!doctype html><meta charset="utf-8"><main></main><pre id="results"></pre>
     <script>${source}\n(${runFixtures})();</script>`);
+  const platformArgs = process.platform === 'darwin' ? ['--single-process'] : [];
   const result = spawnSync(chrome, [
-    '--headless', '--single-process', '--no-sandbox', '--disable-breakpad', '--disable-background-networking',
+    '--headless', '--disable-gpu', '--no-sandbox', '--disable-breakpad', '--disable-background-networking',
+    ...platformArgs,
     '--no-first-run', `--user-data-dir=${path.join(temporary, 'profile')}`, '--dump-dom', pathToFileURL(fixture).href
-  ], { encoding: 'utf8', timeout: 20000 });
-  assert.equal(result.status, 0, result.error?.message || result.stderr || result.signal);
+  ], { encoding: 'utf8', timeout: 30000 });
+  assert.equal(result.status, 0, [result.error?.message, result.signal, result.stderr].filter(Boolean).join('\n'));
   const serialized = result.stdout.match(/<pre id="results">(.+?)<\/pre>/)?.[1];
   assert.ok(serialized, 'The fixture did not report results');
   const checks = JSON.parse(decodeURIComponent(serialized));
